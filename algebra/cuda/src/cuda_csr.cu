@@ -237,13 +237,14 @@ void update_mp_buffer(csr *P) {
   size_t bufferSizeInBytes = 0;
   c_float alpha = 1.0;
 
-  checkCudaErrors(cusparseCsrmvEx_bufferSize(CUDA_handle->cusparseHandle, P->alg,
-                                             CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                             P->m, P->n, P->nnz, &alpha,
-                                             CUDA_FLOAT, P->MatDescription, P->val,
-                                             CUDA_FLOAT, P->row_ptr, P->col_ind, NULL,
-                                             CUDA_FLOAT, &alpha, CUDA_FLOAT, NULL,
-                                             CUDA_FLOAT, CUDA_FLOAT, &bufferSizeInBytes));
+   checkCudaErrors(cusparseSpMV_bufferSize(CUDA_handle->cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE,&alpha, P->MatDescription, NULL, &alpha, NULL, CUDA_FLOAT, P->alg, &bufferSizeInBytes));
+  // checkCudaErrors(cusparseCsrmvEx_bufferSize(CUDA_handle->cusparseHandle, P->alg,
+  //                                            CUSPARSE_OPERATION_NON_TRANSPOSE,
+  //                                            P->m, P->n, P->nnz, &alpha,
+  //                                            CUDA_FLOAT, P->MatDescription, P->val,
+  //                                            CUDA_FLOAT, P->row_ptr, P->col_ind, NULL,
+  //                                            CUDA_FLOAT, &alpha, CUDA_FLOAT, NULL,
+  //                                            CUDA_FLOAT, CUDA_FLOAT, &bufferSizeInBytes));
   
   if (bufferSizeInBytes > P->bufferSizeInBytes) {
     cuda_free((void **) &P->buffer);                            
@@ -277,15 +278,17 @@ csr* csr_alloc(c_int m,
   dev_mat->alg = CUSPARSE_ALG_NAIVE;
 #else
   // Since CUDA 11 there is only one algorithm
-  dev_mat->alg = CUSPARSE_ALG_MERGE_PATH;
+  dev_mat->alg = CUSPARSE_SPMV_COO_ALG2;
 #endif
 
   dev_mat->buffer = NULL;
   dev_mat->bufferSizeInBytes = 0;
 
-  checkCudaErrors(cusparseCreateMatDescr(&dev_mat->MatDescription));
-  cusparseSetMatType(dev_mat->MatDescription, CUSPARSE_MATRIX_TYPE_GENERAL);
-  cusparseSetMatIndexBase(dev_mat->MatDescription, CUSPARSE_INDEX_BASE_ZERO);
+  checkCudaErrors(cusparseCreateCoo(&dev_mat->MatDescription, *(&dev_mat->m), *(&dev_mat->n), *(&dev_mat->nnz), &dev_mat->row_ind, &dev_mat->col_ind, &dev_mat->val, CUSPARSE_INDEX_32I, CUSPARSE_INDEX_BASE_ZERO, CUDA_R_32F));
+  // checkCudaErrors(cusparseCreateMatDescr(&dev_mat->MatDescription));
+  // cusparseSetMatType(dev_mat->MatDescription, CUSPARSE_MATRIX_TYPE_GENERAL);
+  // cusparseSetMatIndexBase(dev_mat->MatDescription, CUSPARSE_INDEX_BASE_ZERO);
+  
 
   if (allocate_on_device > 0) {
     cuda_calloc((void **) &dev_mat->val, (dev_mat->nnz + 1) * sizeof(c_float));
@@ -437,7 +440,7 @@ void copy_csr(csr* target,
   target->bufferSizeInBytes = source->bufferSizeInBytes;
   target->alg               = source->alg;
 
-  cusparseDestroyMatDescr(target->MatDescription);
+  cusparseDestroySpMat(target->MatDescription);
   cuda_free((void **) &target->val);
   cuda_free((void **) &target->row_ind);
   cuda_free((void **) &target->row_ptr);
@@ -689,7 +692,7 @@ void cuda_mat_free(csr *mat) {
     cuda_free((void **) &mat->col_ind);
     cuda_free((void **) &mat->buffer);
     cuda_free((void **) &mat->row_ind);
-    cusparseDestroyMatDescr(mat->MatDescription);
+    cusparseDestroySpMat(mat->MatDescription);
     c_free(mat);
   }
 }

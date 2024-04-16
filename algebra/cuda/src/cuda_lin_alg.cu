@@ -948,14 +948,15 @@ void cuda_mat_Axpy(const csr     *A,
     cuda_vec_mult_sc(d_y, beta, A->m);
     return;
   }
-
-  checkCudaErrors(cusparseCsrmvEx(CUDA_handle->cusparseHandle, A->alg,
-                                  CUSPARSE_OPERATION_NON_TRANSPOSE,
-                                  A->m, A->n, A->nnz, &alpha,
-                                  CUDA_FLOAT, A->MatDescription, A->val,
-                                  CUDA_FLOAT, A->row_ptr, A->col_ind, d_x,
-                                  CUDA_FLOAT, &beta, CUDA_FLOAT, d_y,
-                                  CUDA_FLOAT, CUDA_FLOAT, A->buffer));
+  
+  checkCudaErrors(cusparseSpMV(CUDA_handle->cusparseHandle, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, A->MatDescription , (cusparseDnVecDescr_t) d_x, &beta, (cusparseDnVecDescr_t) d_y, CUDA_FLOAT, A->alg, A->buffer));
+  // checkCudaErrors(cusparseCsrmvEx(CUDA_handle->cusparseHandle, A->alg,
+  //                                 CUSPARSE_OPERATION_NON_TRANSPOSE,
+  //                                 A->m, A->n, A->nnz, &alpha,
+  //                                 CUDA_FLOAT, A->MatDescription, A->val,
+  //                                 CUDA_FLOAT, A->row_ptr, A->col_ind, d_x,
+  //                                 CUDA_FLOAT, &beta, CUDA_FLOAT, d_y,
+  //                                 CUDA_FLOAT, CUDA_FLOAT, A->buffer));
 }
 
 void cuda_mat_quad_form(const csr     *P,
